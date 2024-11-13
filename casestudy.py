@@ -27,11 +27,29 @@ df["date"] = pd.to_datetime(df["arrival_date_year"].astype(str) + "-" + df["arri
 #### 1) SUM(děcka + lidi + plazy) OVER (PARTITION BY hotel, date) as "occupancy_day_total_per_hotel"
 df["guests"] = df["babies"] + df["children"] + df["adults"]
 df["real_guests"] = np.where(df["is_canceled"] == False, df["guests"], np.nan)
+df["nights"] = df["stays_in_week_nights"] + df["stays_in_weekend_nights"]
 ##print(df["guests"])
 ##print(df["real_guests"])
-##df["occupancy_day_total_per_hotel_fake"] = df.groupby(["date", "hotel"])["guests"].transform("sum")
-df["occupancy_day_total_per_hotel"] = df.groupby(["date", "hotel"])["real_guests"].transform("sum")
-##print(df[["occupancy_day_total_per_hotel", "occupancy_day_total_per_hotel_fake"]])
+accom_dates = []
+for index, row in df.iterrows():
+    for i in range(row["nights"]):
+        accom_dates.append({
+            "hotel": row["hotel"],
+            "date": row["date"] + pd.Timedelta(days=i),
+            "real_guests": row["real_guests"]
+        })
+
+# Nový dataframe s všemi datumy
+df_all_accom_dates = pd.DataFrame(accom_dates)
+
+##print(df_all_accom_dates)
+df_all_accom_dates_grouped = df_all_accom_dates.groupby(["date", "hotel"], as_index=False)["real_guests"].sum()
+df_all_accom_dates_grouped.rename(columns={"real_guests": "occupancy_day_total_per_hotel"}, inplace=True)
+#print(df_all_accom_dates_grouped)
+df = pd.merge(df, df_all_accom_dates_grouped, on=["date", "hotel"], how="outer")
+#print(df[["date","hotel","occupancy_day_total_per_hotel"]].drop_duplicates())
+#print(df[["date","hotel","occupancy_day_total_per_hotel"]])
+
 
 #### 2) AVG(lead) OVER ()
 df["mean_lead_days"] = df["lead_time"].mean()
@@ -76,4 +94,4 @@ df["cancel_probability"] = df.groupby("leadtime_bucket")["is_canceled"].transfor
 ##print(df[["leadtime_bucket", "cancel_probability"]].drop_duplicates())
 
 ## output do csv
-df.to_csv('C:/Users/Stepa/Desktop/casestudy_output.csv', sep=',', quoting=csv.QUOTE_ALL, index=False)
+df.to_csv('C:/Users/Stepa/Desktop/CaseStudy/casestudy_output.csv', sep=',', quoting=csv.QUOTE_ALL, index=False)
